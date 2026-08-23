@@ -326,6 +326,26 @@
     </div>
   </section>
 
+  <!-- 2b. HIGH-RISK LIST -->
+  <section id="riskdata">
+    <div class="section-head"><span class="idx">02</span><h2>High-risk user list</h2><span class="desc">— the dataset the whole dashboard is built on</span></div>
+    <div class="upload-grid">
+      <label class="upload-card loaded" id="riskCard" for="riskInput">
+        <div class="uic">🎯</div>
+        <div>
+          <div class="ut">High-risk user list</div>
+          <div class="ud">Same format as the risk export (USERNAME, BRANCH, OLT, RISK SCORE, PRIORITY, ...). Uploading a new file replaces the currently loaded list below.</div>
+          <div class="ustatus" id="riskStatus">✓ Built-in dataset loaded</div>
+        </div>
+        <div class="actions">
+          <span class="btn primary">Upload .xlsx</span>
+          <button type="button" class="btn ghost" id="riskReset" style="display:none;">↺ Reset</button>
+        </div>
+        <input type="file" id="riskInput" accept=".xlsx,.xls,.csv">
+      </label>
+    </div>
+  </section>
+
   <!-- 3. BILLING MATCH -->
   <section id="billing">
     <div class="section-head"><span class="idx">03</span><h2>Match billing data</h2><span class="desc">— upload the "Customer Payment Behaviour" export to see who has already renewed</span></div>
@@ -454,13 +474,16 @@ const RAW_DATA = [["kritikawifi_fglkt","GALKOT","GLKT01",96.3,40,-28.0,-52.0,5,"
 
 const COLOR = { red:'#D7263D', amber:'#C2760A', green:'#0E9F6E', cyan:'#0E7AAE' };
 
-// Convert raw arrays into objects once
-const ALL_USERS = RAW_DATA.map(r => {
-  const o = {};
-  RAW_COLUMNS.forEach((c,i) => o[c] = r[i]);
-  o.usernameKey = (o.username || '').trim().toLowerCase();
-  return o;
-});
+// Convert raw arrays into objects
+function buildAllUsersFromRaw(){
+  return RAW_DATA.map(r => {
+    const o = {};
+    RAW_COLUMNS.forEach((c,i) => o[c] = r[i]);
+    o.usernameKey = (o.username || '').trim().toLowerCase();
+    return o;
+  });
+}
+let ALL_USERS = buildAllUsersFromRaw();
 
 let billingMap = null;   // Map(usernameKey -> {amount, transDate, ...}) or null if not uploaded
 let followupRows = null; // array of parsed followup rows, or null
@@ -742,6 +765,107 @@ document.querySelectorAll('#oltTable thead th').forEach(th => {
   });
 });
 
+/* ---------------- High-risk list upload ---------------- */
+document.getElementById('riskInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const wb = XLSX.read(ev.target.result, { type:'array', cellDates:true });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header:1, defval:null });
+      const headerRowIdx = rows.findIndex(r => r.some(c => String(c||'').trim().toUpperCase() === 'USERNAME'));
+      if (headerRowIdx === -1){ alert('USERNAME column not found in this sheet.'); return; }
+      const header = rows[headerRowIdx].map(h => String(h||'').trim().toUpperCase());
+      const findCol = (...names) => {
+        for (const n of names){ const idx = header.indexOf(n); if (idx >= 0) return idx; }
+        return -1;
+      };
+      const uCol = findCol('USERNAME');
+      const branchCol = findCol('BRANCH');
+      const oltCol = findCol('OLT');
+      const riskCol = findCol('RISK SCORE','RISKSCORE','RISK');
+      const priorityCol = findCol('PRIORITY');
+      const avgDiffCol = findCol('AVG DIFF','AVGDIFF');
+      const latestDiffCol = findCol('LATEST DIFF','LATESTDIFF');
+      const daysRemCol = findCol('DAYS REMAINING','DAYSREMAINING','DAYS REM');
+      const expiryCol = findCol('EXPIRY DATE','EXPIRYDATE');
+      const revenueCol = findCol('REVENUE','FORECAST REVENUE','FORECAST REVENUE (NPR)');
+      const typeCol = findCol('TYPE');
+      const statusCol = findCol('STATUS');
+
+      const newUsers = [];
+      for (let i = headerRowIdx+1; i < rows.length; i++){
+        const row = rows[i];
+        const uname = row[uCol];
+        if (!uname) continue;
+        newUsers.push({
+          username: uname,
+          usernameKey: String(uname).trim().toLowerCase(),
+          branch: branchCol>=0 ? row[branchCol] : null,
+          olt: oltCol>=0 ? row[oltCol] : null,
+          riskScore: riskCol>=0 ? Number(row[riskCol]) : null,
+          priority: priorityCol>=0 ? Number(row[priorityCol]) : null,
+          avgDiff: avgDiffCol>=0 ? Number(row[avgDiffCol]) : null,
+          latestDiff: latestDiffCol>=0 ? Number(row[latestDiffCol]) : null,
+          daysRemaining: daysRemCol>=0 ? Number(row[daysRemCol]) : null,
+          expiryDate: expiryCol>=0 ? row[expiryCol] : null,
+          revenue: revenueCol>=0 ? Number(row[revenueCol]) : null,
+          type: typeCol>=0 ? row[typeCol] : null,
+          status: statusCol>=0 ? row[statusCol] : null
+        });
+      }
+      if (!newUsers.length){ alert('No usable rows found in this sheet.'); return; }
+
+      ALL_USERS = newUsers;
+      document.getElementById('riskStatus').textContent = `✓ ${file.name} — ${ALL_USERS.length.toLocaleString()} users loaded`;
+      document.getElementById('riskCard').classList.add('loaded');
+      document.getElementById('riskReset').style.display = 'inline-flex';
+      billingMap = null;
+      followupRows = null;
+      document.getElementById('billingStatus').textContent = '';
+      document.getElementById('billingCard').classList.remove('loaded');
+      document.getElementById('billingReset').style.display = 'none';
+      document.getElementById('billingInput').value = '';
+      document.getElementById('fuStatus').textContent = '';
+      document.getElementById('fuCard').classList.remove('loaded');
+      document.getElementById('fuReset').style.display = 'none';
+      document.getElementById('fuInput').value = '';
+      if (window.storage){
+        window.storage.delete('billing-data', false).catch(()=>{});
+        window.storage.delete('followup-data', false).catch(()=>{});
+      }
+      saveRiskToStorage(file.name);
+      branchSel.value = '__ALL__';
+      buildBranchOptions();
+      buildOltOptions();
+      oltSel.value = '__ALL__';
+      renderHeader();
+      render();
+    } catch(err){
+      alert('Could not read this file: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+document.getElementById('riskReset').addEventListener('click', (e) => {
+  e.preventDefault(); e.stopPropagation();
+  ALL_USERS = buildAllUsersFromRaw();
+  document.getElementById('riskStatus').textContent = '✓ Built-in dataset loaded';
+  document.getElementById('riskCard').classList.add('loaded');
+  document.getElementById('riskReset').style.display = 'none';
+  document.getElementById('riskInput').value = '';
+  if (window.storage){ window.storage.delete('risk-data', false).catch(()=>{}); }
+  branchSel.value = '__ALL__';
+  buildBranchOptions();
+  buildOltOptions();
+  oltSel.value = '__ALL__';
+  renderHeader();
+  render();
+});
+
 /* ---------------- Billing upload ---------------- */
 document.getElementById('billingInput').addEventListener('change', (e) => {
   const file = e.target.files[0];
@@ -856,6 +980,12 @@ document.getElementById('fuReset').addEventListener('click', (e) => {
 document.getElementById('fuEmptyLink').addEventListener('click', () => document.getElementById('fuInput').click());
 
 /* ---------------- Browser auto-save (persists uploads across reloads) ---------------- */
+function saveRiskToStorage(fileName){
+  if (!window.storage || !ALL_USERS) return;
+  try {
+    window.storage.set('risk-data', JSON.stringify({ fileName, users: ALL_USERS }), false).catch(()=>{});
+  } catch(e){}
+}
 function saveBillingToStorage(fileName){
   if (!window.storage || !billingMap) return;
   try {
@@ -870,6 +1000,21 @@ function saveFollowupToStorage(fileName){
 }
 async function restoreFromStorage(){
   if (!window.storage) return;
+  try {
+    const r = await window.storage.get('risk-data', false);
+    if (r && r.value){
+      const data = JSON.parse(r.value);
+      if (data.users && data.users.length){
+        ALL_USERS = data.users;
+        document.getElementById('riskStatus').textContent = `✓ ${data.fileName} — ${ALL_USERS.length.toLocaleString()} users loaded (restored)`;
+        document.getElementById('riskCard').classList.add('loaded');
+        document.getElementById('riskReset').style.display = 'inline-flex';
+        buildBranchOptions();
+        buildOltOptions();
+        renderHeader();
+      }
+    }
+  } catch(e){}
   try {
     const b = await window.storage.get('billing-data', false);
     if (b && b.value){
