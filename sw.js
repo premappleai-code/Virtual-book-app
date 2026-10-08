@@ -1,4 +1,4 @@
-const C='kagajat-v8',F=['./','index.html','manifest.json','icon-192.png','icon-512.png','fonts/hind-devanagari-400-normal.woff2','fonts/hind-devanagari-600-normal.woff2','fonts/hind-devanagari-700-normal.woff2','fonts/hind-latin-400-normal.woff2','fonts/hind-latin-600-normal.woff2','fonts/hind-latin-700-normal.woff2'];
+const C='kagajat-v9',F=['./','index.html','manifest.json','icon-192.png','icon-512.png','icon-maskable-192.png','icon-maskable-512.png','fonts/hind-devanagari-400-normal.woff2','fonts/hind-devanagari-600-normal.woff2','fonts/hind-devanagari-700-normal.woff2','fonts/hind-latin-400-normal.woff2','fonts/hind-latin-600-normal.woff2','fonts/hind-latin-700-normal.woff2'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>Promise.all(F.map(u=>c.add(new Request(u,{cache:'reload'})).catch(()=>{})))));self.skipWaiting()});
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))).then(()=>clients.claim())));
 self.addEventListener('fetch',e=>{const r=e.request;if(r.method!=='GET')return;const u=new URL(r.url);if(u.origin!==location.origin)return;
