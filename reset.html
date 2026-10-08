@@ -1,0 +1,11 @@
+<!doctype html><html lang="ne"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>App ठीक गर्ने</title>
+<style>body{font-family:system-ui,sans-serif;background:#f4f6fb;color:#0f172a;margin:0;padding:24px;line-height:1.6}.c{max-width:480px;margin:auto;background:#fff;border-radius:20px;padding:22px;box-shadow:0 8px 24px rgba(15,23,42,.08)}h2{margin-top:0}pre{white-space:pre-wrap;font:14px/1.7 system-ui;background:#f1f5f9;border-radius:12px;padding:12px}a.b{display:block;text-align:center;background:#2563eb;color:#fff;text-decoration:none;padding:14px;border-radius:14px;font-weight:700;margin-top:16px}</style></head>
+<body><div class="c"><h2>🔧 App ठीक गर्दै…</h2><pre id="l">सुरु हुँदैछ…
+</pre><div id="n"></div></div>
+<script>
+(async()=>{const L=document.getElementById('l');L.textContent='';const w=m=>L.textContent+=m+'\n';
+try{const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs){await r.unregister()}w('✔ पुरानो service worker हटाइयो ('+rs.length+')')}catch(e){w('– service worker: '+e.message)}
+try{const ks=await caches.keys();for(const k of ks)await caches.delete(k);w('✔ पुरानो cache हटाइयो ('+ks.length+')')}catch(e){w('– cache: '+e.message)}
+w('✔ तपाईंका फोटो र कागजात सुरक्षित छन् (हटाइएको छैन)');
+document.getElementById('n').innerHTML='<a class="b" href="./?fresh='+Date.now()+'">App खोल्नुहोस्</a><p style="font-size:14px;color:#64748b">खुलेपछि: मेनु → Install जाँच</p>'})();
+</script></body></html>
