@@ -1,7 +1,8 @@
-const C='kagajat-v9',F=['./','index.html','manifest.json','icon-192.png','icon-512.png','icon-maskable-192.png','icon-maskable-512.png','fonts/hind-devanagari-400-normal.woff2','fonts/hind-devanagari-600-normal.woff2','fonts/hind-devanagari-700-normal.woff2','fonts/hind-latin-400-normal.woff2','fonts/hind-latin-600-normal.woff2','fonts/hind-latin-700-normal.woff2'];
+const C='kagajat-v13',F=['./','index.html','manifest.json','icon-192.png','icon-512.png','icon-maskable-192.png','icon-maskable-512.png','fonts/hind-devanagari-400-normal.woff2','fonts/hind-devanagari-600-normal.woff2','fonts/hind-devanagari-700-normal.woff2','fonts/hind-latin-400-normal.woff2','fonts/hind-latin-600-normal.woff2','fonts/hind-latin-700-normal.woff2'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>Promise.all(F.map(u=>c.add(new Request(u,{cache:'reload'})).catch(()=>{})))));self.skipWaiting()});
-self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))).then(()=>clients.claim())));
-self.addEventListener('fetch',e=>{const r=e.request;if(r.method!=='GET')return;const u=new URL(r.url);if(u.origin!==location.origin)return;
-  const heavy=/\/(fonts|ocr)\//.test(u.pathname);
-  if(heavy){e.respondWith(caches.match(r).then(h=>h||fetch(r).then(x=>{if(x.ok){const cp=x.clone();caches.open(C).then(c=>c.put(r,cp))}return x})));return}
+self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C&&x!=='share-inbox').map(x=>caches.delete(x)))).then(()=>clients.claim())));
+self.addEventListener('fetch',e=>{const r=e.request,u=new URL(r.url);
+  if(r.method==='POST'&&u.pathname.endsWith('/share-target')){e.respondWith((async()=>{try{const fd=await r.formData(),fs=fd.getAll('photos'),c=await caches.open('share-inbox');let i=0;for(const f of fs){if(f&&f.size)await c.put(new URL('inbox-'+Date.now()+'-'+(i++),self.registration.scope).href,new Response(f,{headers:{'content-type':f.type||'image/jpeg','x-name':encodeURIComponent(f.name||'photo.jpg')}}))}}catch(err){}return Response.redirect(new URL('./?share=1',self.registration.scope).href,303)})());return}
+  if(r.method!=='GET'||u.origin!==location.origin)return;
+  if(/\/(fonts|ocr)\//.test(u.pathname)){e.respondWith(caches.match(r).then(h=>h||fetch(r).then(x=>{if(x.ok){const cp=x.clone();caches.open(C).then(c=>c.put(r,cp))}return x})));return}
   e.respondWith(fetch(r,{cache:'no-cache'}).then(x=>{if(x.ok){const cp=x.clone();caches.open(C).then(c=>c.put(r,cp))}return x}).catch(()=>caches.match(r).then(h=>h||caches.match('index.html'))))});
